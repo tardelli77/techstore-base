@@ -9,6 +9,7 @@ import Carrinho from './pages/Carrinho'
 import Estoque from './pages/Estoque'
 import { buscarProdutos } from './services/produtos'
 import { buscarClientes } from './services/clientes'
+import { produtoDisponivel } from './utils/carrinho'
 
 export default function App() {
   const [produtos, setProdutos] = useState([])
@@ -17,6 +18,7 @@ export default function App() {
   const [carrinho, setCarrinho] = useState([])
   const [clientes, setClientes] = useState([])
   const [clienteAtualId, setClienteAtualId] = useState(null)
+  const [listaEspera, setListaEspera] = useState([])
 
   useEffect(() => {
     buscarProdutos()
@@ -31,7 +33,43 @@ export default function App() {
   }, [])
 
   function adicionarAoCarrinho(produto) {
-    setCarrinho(carrinho.concat(produto))
+    const estoqueDisponivel = Number(produto?.estoque ?? 0)
+    const quantidadeNoCarrinho = carrinho.filter((item) => item.id === produto.id).length
+
+    if (!produtoDisponivel(produto) || quantidadeNoCarrinho >= estoqueDisponivel) {
+      return
+    }
+
+    setCarrinho((atual) => atual.concat(produto))
+  }
+
+  function registrarInteresse(produtoId, dados) {
+    const nome = dados?.nome?.trim()
+    const email = dados?.email?.trim()
+
+    if (!produtoId || !nome || !email) {
+      return
+    }
+
+    setListaEspera((atual) => {
+      const jaExiste = atual.some(
+        (item) => item.produtoId === produtoId && item.email.toLowerCase() === email.toLowerCase()
+      )
+
+      if (jaExiste) {
+        return atual
+      }
+
+      return [
+        ...atual,
+        {
+          id: `${produtoId}-${Date.now()}`,
+          produtoId,
+          nome,
+          email,
+        },
+      ]
+    })
   }
 
   function removerUmaUnidade(produtoId) {
@@ -67,7 +105,13 @@ export default function App() {
             />
             <Route
               path="/produto/:id"
-              element={<PaginaProduto produtos={produtos} onAdicionar={adicionarAoCarrinho} />}
+              element={
+                <PaginaProduto
+                  produtos={produtos}
+                  onAdicionar={adicionarAoCarrinho}
+                  onRegistrarInteresse={registrarInteresse}
+                />
+              }
             />
             <Route
               path="/carrinho"
@@ -81,7 +125,7 @@ export default function App() {
                 />
               }
             />
-            <Route path="/estoque" element={<Estoque produtos={produtos} />} />
+            <Route path="/estoque" element={<Estoque produtos={produtos} listaEspera={listaEspera} />} />
           </Routes>
         )}
       </main>
